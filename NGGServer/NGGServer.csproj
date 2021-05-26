@@ -6,4 +6,8 @@
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\GameMessages\GameMessages.csproj" />
+    </ItemGroup>
+
 </Project>

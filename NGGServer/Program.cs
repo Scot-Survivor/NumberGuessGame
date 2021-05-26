@@ -1,13 +1,16 @@
 ﻿/* Sources & Inspirations: https://docs.microsoft.com/en-us/dotnet/framework/network-programming/asynchronous-server-socket-example */
 /* Sources & Inspirations: https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/exceptions/creating-and-throwing-exceptions */
+/* Only code directly copied are linked above &/or Gave me the idea for some part of this program. */
 
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Collections.Generic;
-using System.ComponentModel;
+using GameMessages;
 
 namespace NGGServer
 { 
@@ -36,20 +39,33 @@ namespace NGGServer
         protected ValueException(System.Runtime.Serialization.SerializationInfo info,
             System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }
+    
+    [Serializable]
+    public class GameStateException : Exception
+    {
+        public GameStateException(): base() { }
+        public GameStateException(string message): base(message) { }
+        public GameStateException(string message, Exception inner): base(message, inner) { }
+        
+        // A constructor is needed for serialization when an
+        // exception propagates from a remoting server to the client.
+        protected GameStateException(System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
     public class GameObject
     {
         // Reference the Games By ID
         private int _gameId;
         
         // Generic Settings for the Game
-        private static int _maxNum;
-        private static int _minNum;
-        private int _maxPlayers = 5;
+        private int _maxNum;
+        private int _minNum;
+        private readonly int _maxPlayers = 5;
 
         private readonly Dictionary<string, int> _settings = new Dictionary<string, int>();
         
         // Bool to detect if a Game is in Win state.
-        public static bool HasWon = false;
+        private bool _hasWon = false;
         
         // Number of current players.
         private int _currentPlayers = 0;
@@ -124,7 +140,8 @@ namespace NGGServer
         public bool CheckWin(int guess)
         {
             if (guess != _numberToGuess) return false;
-            HasWon = true;
+            if (!_hasWon) throw new GameStateException("Game has Ended.");
+            _hasWon = true;
             return true;
         }
         
@@ -147,11 +164,12 @@ namespace NGGServer
         public Socket ClientSocket;
     }
 
-    public static class AsynchronousSocketListener
+    public class AsynchronousSocketListener
     {
         private static readonly ManualResetEvent AllDone = new(false);
+        private List<GameObject> GameList = new List<GameObject>();
 
-        public static void StartServer()
+        public void StartServer()
         {
             // Establish the local endpoint for the socket.
             // The DNS name of the server.
@@ -191,7 +209,7 @@ namespace NGGServer
             Console.ReadLine();
         }
 
-        private static void AcceptCallback(IAsyncResult ar)
+        private void AcceptCallback(IAsyncResult ar)
         {
             // Signal the main thread to continue.
             AllDone.Set();
@@ -213,7 +231,7 @@ namespace NGGServer
             }
         }
 
-        private static void ReadCallback(IAsyncResult ar)
+        private void ReadCallback(IAsyncResult ar)
         {
             // Retrieve the state object and the handler socket  
             // from the async socket
@@ -236,7 +254,8 @@ namespace NGGServer
                     if (content.IndexOf("<EOF>", StringComparison.Ordinal) > -1)
                     {
                         // Continue with game logic
-                        // TODO Game logic.
+                        ClientMessage clientMessage = BuildMessage(content);
+                        Console.WriteLine($"Received Message: {clientMessage}");
                     }
                     else
                     {
@@ -252,7 +271,12 @@ namespace NGGServer
             }
         }
 
-        private static void Send(Socket handler, String data)
+        private ClientMessage BuildMessage(string clientMessage)
+        {
+            return JsonSerializer.Deserialize<ClientMessage>(clientMessage);
+        }
+        
+        private void Send(Socket handler, String data)
         {
             byte[] byteData = Encoding.ASCII.GetBytes(data);
             
@@ -287,11 +311,12 @@ namespace NGGServer
     }
     class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             // Currently doesn't require an instance, because everything is stored inside a 
             // "StateObject"
-            AsynchronousSocketListener.StartServer();
+            var server = new AsynchronousSocketListener();
+            server.StartServer();
         }
     }
 }
