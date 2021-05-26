@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Collections.Generic;
+using System.Linq;
 using GameMessages;
 
 namespace NGGServer
@@ -174,8 +175,9 @@ namespace NGGServer
             // Establish the local endpoint for the socket.
             // The DNS name of the server.
             // Run the listener
-            IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
-            IPAddress ipAddress = ipHostInfo.AddressList[0];
+            // IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
+            // TODO Set the string as a start up option (either cli arg OR string via console.readline
+            IPAddress ipAddress = IPAddress.Parse("192.168.5.230"); // ipHostInfo.AddressList[2];
             IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
             
             // Create the socket
@@ -194,7 +196,7 @@ namespace NGGServer
                     AllDone.Reset();
 
                     // Start Asynchronously listening for connections.
-                    Console.WriteLine("Listening for connections.");
+                    Console.WriteLine($"Listening for connections. On {localEndPoint}.");
                     listener.BeginAccept(
                         AcceptCallback, listener);
                     AllDone.WaitOne();
