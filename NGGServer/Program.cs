@@ -1,13 +1,134 @@
 ﻿/* Sources & Inspirations: https://docs.microsoft.com/en-us/dotnet/framework/network-programming/asynchronous-server-socket-example */
+/* Sources & Inspirations: https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/exceptions/creating-and-throwing-exceptions */
 
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Collections.Generic;
+using System.ComponentModel;
 
 namespace NGGServer
-{
+{ 
+    [Serializable]
+    public class PlayerLimit : Exception
+    {
+        public PlayerLimit(): base() { }
+        public PlayerLimit(string message): base(message) { }
+        public PlayerLimit(string message, Exception inner) : base(message, inner) { }
+        
+        // A constructor is needed for serialization when an
+        // exception propagates from a remoting server to the client.
+        protected PlayerLimit(System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
+
+    [Serializable]
+    public class ValueException : Exception
+    {
+        public ValueException(): base() { }
+        public ValueException(string message): base(message) { }
+        public ValueException(string message, Exception inner): base(message, inner) { }
+        
+        // A constructor is needed for serialization when an
+        // exception propagates from a remoting server to the client.
+        protected ValueException(System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
+    public class GameObject
+    {
+        // Reference the Games By ID
+        private int _gameId;
+        
+        // Generic Settings for the Game
+        private static int _maxNum;
+        private static int _minNum;
+        private int _maxPlayers = 5;
+
+        private readonly Dictionary<string, int> _settings = new Dictionary<string, int>();
+        
+        // Bool to detect if a Game is in Win state.
+        public static bool HasWon = false;
+        
+        // Number of current players.
+        private int _currentPlayers = 0;
+
+        private static int _numberToGuess;
+
+        public GameObject(int gameId, int maxNum, int minNum)
+        {
+            _gameId = gameId;
+            SetMinNumber(minNum);
+            SetMaxNumber(maxNum);
+            _numberToGuess = new Random().Next(_minNum, _maxNum);
+            _settings.Add("MaxNum", maxNum);
+            _settings.Add("MinNum", minNum);
+            _settings.Add("MaxPlayers", _maxPlayers);
+        }
+        public GameObject(int gameId, int maxNum, int minNum, int maxPlayers)
+        {
+            _gameId = gameId;
+            _maxPlayers = maxPlayers;
+            SetMinNumber(minNum);
+            SetMaxNumber(maxNum);
+            _numberToGuess = new Random().Next(_minNum, _maxNum);
+            _settings.Add("MaxNum", maxNum);
+            _settings.Add("MinNum", minNum);
+            _settings.Add("MaxPlayers", _maxPlayers);
+        }
+
+        public void NewPlayer()
+        {
+            if (_currentPlayers + 1 <= _maxPlayers)
+            {
+                _currentPlayers++;
+            }
+            else
+            {
+                throw new PlayerLimit($"This game is full. Current Players: {_currentPlayers}");
+            }
+        }
+
+        private void SetMaxNumber(int newMaxNum)
+        {
+            if (newMaxNum >= _minNum)
+            {
+                _maxNum = newMaxNum;
+                _settings["MaxNum"] = newMaxNum;
+            }
+            else
+            {
+                throw new ValueException("Maximum Random Number cannot be higher than Minimum Random Number.");
+            }
+        }
+
+        private void SetMinNumber(int newMinNum)
+        {
+            if (newMinNum <= _maxNum)
+            {
+                _minNum = newMinNum;
+                _settings["MinNum"] = newMinNum;
+            }
+            else
+            {
+                throw new ValueException("Minimum Random Number cannot be lower than Maximum Random Number.");
+            }
+        }
+
+        public Dictionary<string, int> GetSettings()
+        {
+            return _settings;
+        }
+
+        public bool CheckWin(int guess)
+        {
+            if (guess != _numberToGuess) return false;
+            HasWon = true;
+            return true;
+        }
+        
+    }
     public class StateObject
     {
         // Size of buffer read
@@ -18,6 +139,9 @@ namespace NGGServer
         
         // The data string
         public readonly StringBuilder Sb = new();
+        
+        // The ID of the Game that the state is associated with.
+        public int GameId;
         
         // Clients socket
         public Socket ClientSocket;
